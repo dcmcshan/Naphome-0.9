@@ -1,4 +1,5 @@
 # Espressif ESP32 Partition Table
 # Name,  Type, SubType, Offset,  Size
-factory, app,  factory, 0x010000, 0x200000
+factory, app,  factory, 0x010000, 0x600000
+nvs,    data, nvs,     0x610000, 0x6000
 model,  data, spiffs,         , 0x500000

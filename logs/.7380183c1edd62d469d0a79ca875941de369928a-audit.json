@@ -9,6 +9,11 @@
             "date": 1765031899099,
             "name": "/Users/danielmcshan/GitHub/Naphome-0.9/logs/mcp-puppeteer-2025-12-06.log",
             "hash": "88b7e93fb044c7560166ac8b2574f64c4f34d48322579a12b262fbd654031ee3"
+        },
+        {
+            "date": 1765137046029,
+            "name": "/Users/danielmcshan/GitHub/Naphome-0.9/logs/mcp-puppeteer-2025-12-07.log",
+            "hash": "219cf5408ea812b874115fbdbcca45d16234e04ed55e5d4034d6c2d0069251fb"
         }
     ],
     "hashType": "sha256"

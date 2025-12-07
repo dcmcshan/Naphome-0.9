@@ -10,7 +10,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "driver/i2c_master.h"
+#include "driver/i2c.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,8 +30,7 @@ typedef struct {
 } sgp30_data_t;
 
 typedef struct {
-    i2c_master_bus_handle_t i2c_bus;
-    i2c_master_dev_handle_t i2c_dev;
+    i2c_port_t i2c_port;
     uint8_t device_addr;
     bool initialized;
     bool hardware_present;
@@ -44,7 +43,7 @@ typedef struct {
 /**
  * @brief Initialize SGP30 sensor
  */
-bool sgp30_init(sgp30_handle_t *handle, i2c_master_bus_handle_t i2c_bus, uint8_t device_addr);
+bool sgp30_init(sgp30_handle_t *handle, i2c_port_t i2c_port, uint8_t device_addr);
 
 /**
  * @brief Deinitialize SGP30 sensor

@@ -10,6 +10,7 @@
 #include "freertos/task.h"
 #include <string.h>
 #include <math.h>
+#include "driver/i2c.h"
 
 static const char *TAG = "sht30_driver";
 
@@ -30,40 +31,35 @@ static uint8_t sht30_crc8(const uint8_t *data, size_t len)
     return crc;
 }
 
-bool sht30_init(sht30_handle_t *handle, i2c_master_bus_handle_t i2c_bus, uint8_t device_addr)
+bool sht30_init(sht30_handle_t *handle, i2c_port_t i2c_port, uint8_t device_addr)
 {
-    if (handle == NULL || i2c_bus == NULL) {
+    if (handle == NULL) {
         ESP_LOGE(TAG, "Invalid parameters");
         return false;
     }
 
     memset(handle, 0, sizeof(sht30_handle_t));
-    handle->i2c_bus = i2c_bus;
+    handle->i2c_port = i2c_port;
     handle->device_addr = (device_addr != 0) ? device_addr : SHT30_I2C_ADDR;
 
-    // Try to create I2C device handle
-    i2c_device_config_t dev_cfg = {
-        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
-        .device_address = handle->device_addr,
-        .scl_speed_hz = 100000,
-    };
+    // Try soft reset to detect hardware (using old I2C API)
+    i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+    i2c_master_start(cmd);
+    i2c_master_write_byte(cmd, (handle->device_addr << 1) | I2C_MASTER_WRITE, true);
+    uint8_t reset_cmd[2] = {0x30, 0xA2};
+    i2c_master_write(cmd, reset_cmd, 2, true);
+    i2c_master_stop(cmd);
     
-    esp_err_t ret = i2c_master_bus_add_device(i2c_bus, &dev_cfg, &handle->i2c_dev);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to add I2C device at 0x%02X: %s", handle->device_addr, esp_err_to_name(ret));
-        handle->hardware_present = false;
+    esp_err_t ret = i2c_master_cmd_begin(i2c_port, cmd, pdMS_TO_TICKS(100));
+    i2c_cmd_link_delete(cmd);
+    
+    if (ret == ESP_OK) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        handle->hardware_present = true;
+        ESP_LOGI(TAG, "SHT30 hardware detected at address 0x%02X", handle->device_addr);
     } else {
-        // Try soft reset to detect hardware
-        uint8_t reset_cmd[2] = {0x30, 0xA2};
-        ret = i2c_master_transmit(handle->i2c_dev, reset_cmd, 2, pdMS_TO_TICKS(100));
-        if (ret == ESP_OK) {
-            vTaskDelay(pdMS_TO_TICKS(10));
-            handle->hardware_present = true;
-            ESP_LOGI(TAG, "SHT30 hardware detected at address 0x%02X", handle->device_addr);
-        } else {
-            ESP_LOGW(TAG, "SHT30 hardware not detected, will use synthetic data");
-            handle->hardware_present = false;
-        }
+        ESP_LOGW(TAG, "SHT30 hardware not detected, will use synthetic data");
+        handle->hardware_present = false;
     }
 
     // Initialize synthetic data generator
@@ -77,10 +73,6 @@ bool sht30_init(sht30_handle_t *handle, i2c_master_bus_handle_t i2c_bus, uint8_t
 
 void sht30_deinit(sht30_handle_t *handle)
 {
-    if (handle != NULL && handle->i2c_dev != NULL) {
-        i2c_master_bus_rm_device(handle->i2c_dev);
-        handle->i2c_dev = NULL;
-    }
     if (handle != NULL) {
         handle->initialized = false;
     }
@@ -95,18 +87,36 @@ bool sht30_read(sht30_handle_t *handle, sht30_data_t *data)
 
     data->hardware_present = handle->hardware_present;
 
-    if (handle->hardware_present && handle->i2c_dev != NULL) {
-        // Try to read from real hardware
-        uint8_t cmd[2] = {0x24, 0x00};  // High precision measurement
-        esp_err_t ret = i2c_master_transmit(handle->i2c_dev, cmd, 2, pdMS_TO_TICKS(100));
+    if (handle->hardware_present) {
+        // Try to read from real hardware using old I2C API
+        // Send measurement command
+        i2c_cmd_handle_t cmd = i2c_cmd_link_create();
+        i2c_master_start(cmd);
+        i2c_master_write_byte(cmd, (handle->device_addr << 1) | I2C_MASTER_WRITE, true);
+        uint8_t measure_cmd[2] = {0x24, 0x00};  // High precision measurement
+        i2c_master_write(cmd, measure_cmd, 2, true);
+        i2c_master_stop(cmd);
+        
+        esp_err_t ret = i2c_master_cmd_begin(handle->i2c_port, cmd, pdMS_TO_TICKS(100));
+        i2c_cmd_link_delete(cmd);
+        
         if (ret != ESP_OK) {
             ESP_LOGW(TAG, "I2C transmit failed, falling back to synthetic data");
             handle->hardware_present = false;
         } else {
             vTaskDelay(pdMS_TO_TICKS(SHT30_MEASURE_DELAY_MS));
             
+            // Read data
+            cmd = i2c_cmd_link_create();
+            i2c_master_start(cmd);
+            i2c_master_write_byte(cmd, (handle->device_addr << 1) | I2C_MASTER_READ, true);
             uint8_t rx_data[6];
-            ret = i2c_master_receive(handle->i2c_dev, rx_data, 6, pdMS_TO_TICKS(100));
+            i2c_master_read(cmd, rx_data, 6, I2C_MASTER_LAST_NACK);
+            i2c_master_stop(cmd);
+            
+            ret = i2c_master_cmd_begin(handle->i2c_port, cmd, pdMS_TO_TICKS(100));
+            i2c_cmd_link_delete(cmd);
+            
             if (ret == ESP_OK) {
                 // Verify CRC
                 if (sht30_crc8(rx_data, 2) == rx_data[2] && 

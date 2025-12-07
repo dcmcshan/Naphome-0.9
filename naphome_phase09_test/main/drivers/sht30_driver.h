@@ -10,7 +10,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include "driver/i2c_master.h"
+#include "driver/i2c.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,8 +29,7 @@ typedef struct {
 } sht30_data_t;
 
 typedef struct {
-    i2c_master_bus_handle_t i2c_bus;
-    i2c_master_dev_handle_t i2c_dev;
+    i2c_port_t i2c_port;
     uint8_t device_addr;
     bool initialized;
     bool hardware_present;
@@ -43,11 +42,11 @@ typedef struct {
 /**
  * @brief Initialize SHT30 sensor
  * @param handle Pointer to SHT30 handle structure
- * @param i2c_bus I2C master bus handle
+ * @param i2c_port I2C port number (I2C_NUM_0 or I2C_NUM_1)
  * @param device_addr I2C device address (default: SHT30_I2C_ADDR)
  * @return true if initialized successfully, false otherwise
  */
-bool sht30_init(sht30_handle_t *handle, i2c_master_bus_handle_t i2c_bus, uint8_t device_addr);
+bool sht30_init(sht30_handle_t *handle, i2c_port_t i2c_port, uint8_t device_addr);
 
 /**
  * @brief Deinitialize SHT30 sensor

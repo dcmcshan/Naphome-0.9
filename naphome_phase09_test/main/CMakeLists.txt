@@ -2,11 +2,15 @@ set(srcs
     naphome_test_suite.c
     drivers/sht30_driver.c
     drivers/sgp30_driver.c
+    drivers/bh1750_driver.c
+    drivers/scd30_driver.c
+    web_server.c
     )
 
 set(requires
     hardware_driver
     esp_http_client
+    esp_http_server
     mbedtls
     nvs_flash
     esp_wifi
@@ -15,6 +19,7 @@ set(requires
     driver
     esp-tls
     json
+    mdns
     )
 
 idf_component_register(SRCS ${srcs}
@@ -22,6 +27,6 @@ idf_component_register(SRCS ${srcs}
                        REQUIRES ${requires}
                        EMBED_FILES 
                            "offline_welcome.wav"
-                           "frequencies_fear1.mp3")
+                           "Time.mp3")
 
 component_compile_options(-w)
